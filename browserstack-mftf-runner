@@ -1,0 +1,75 @@
+#!/usr/bin/env php
+<?php
+
+function endsWith( $haystack, $needle ) {
+    $length = strlen( $needle );
+    if( !$length ) {
+        return true;
+    }
+    return substr( $haystack, -$length ) === $needle;
+}
+
+if (PHP_SAPI !== 'cli') {
+    echo 'browserstack-mftf-runner must be run as a CLI application';
+    exit(1);
+}
+
+if (sizeof($argv)<4) {
+    echo "Incorrect Options!\nUsage: ./browserstack-mftf-runner <mftf-cli-command> <test-name|test-suite-name> <magento-test-folder> [--log]\n";
+    exit(1);
+}
+
+$configFile = realpath(__DIR__ . '/config.json');
+$str = "";
+$output=null;
+$retval=null;
+
+try {
+    if (file_exists($configFile)) {
+    	$str = file_get_contents($configFile);
+    } else {
+        echo "Please make a config.json file with relevant environment configurations.";
+    }
+} catch (\Exception $e) {
+    echo 'ConfigFile error: ' . $e->getMessage();
+    exit(1);
+}
+
+try {
+	$config = json_decode($str);
+	for ($x = 0; $x < sizeof($config); $x++) {
+		exec("mkdir parallel_$x");
+		exec("cp -R ".$argv[3]."/* parallel_$x");
+		$file = realpath(__DIR__ . "/parallel_$x/dev/tests/functional.suite.yml");
+		$functional_suite = file_get_contents($file);
+		$spaces = "                ";
+		$caps = "";
+		foreach($config[$x] as $key => $value) {
+			if ($key === "browserName") {
+				exec("parallel_$x/bin/mftf setup:env --BROWSER=".$value);
+			}
+			$caps = $caps . $spaces . $key . ": \"" . $value . "\"\n";
+		}
+		if (endsWith($functional_suite, "capabilities:\n")) {
+			echo "\nCapabilities for parallel $x:\n";
+			echo $caps;
+			file_put_contents($file,$functional_suite.$caps);
+		} else {
+			echo "Please make sure functional.suite.yml file ends with text 'capabilities:'";
+			exit(1);
+		}
+	}
+	echo "\nRunning test on ".sizeof($config)." parallel browsers.\n";
+	exec("./test-run.sh {$argv[1]} {$argv[2]} ".sizeof($config),$output,$retval);
+	for ($x = 0; $x < sizeof($config); $x++) {
+		exec("rm -r parallel_$x");
+	}
+	print_r($output);
+	if ($argv[4] === "--log") {
+	    file_put_contents("log_".time().".txt", print_r($output, true));
+    }
+} catch (\Exception $e) {
+    echo 'ConfigFile error: ' . $e->getMessage();
+    exit(1);
+}
+?>
