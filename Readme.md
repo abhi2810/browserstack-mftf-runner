@@ -1,3 +1,6 @@
+# Prerequisites
+- PHP 7.2+
+- MFTF Instance
 # Steps to use browserstack-mftf-runner
 1. Please make sure to add relevant environment variables in .env file. (Refer to the .env.sample file)
 2. Please make sure functional.suite.yml file ends with text 'capabilities:'. (Refer to the sample_functional.suite.yml file)
